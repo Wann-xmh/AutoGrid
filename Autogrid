@@ -1,0 +1,228 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import networkx as nx
+from collections import deque
+from sklearn.model_selection import train_test_split, learning_curve
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix
+from matplotlib.lines import Line2D
+
+# Configure Matplotlib for rendering Chinese characters and academic styling
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False
+sns.set_theme(style="whitegrid")
+
+# =============================================================================
+# PART 1: PREDICTIVE OUTAGE MODELING (LOGISTIC REGRESSION)
+# =============================================================================
+
+print("--- PART 1: AI FORECASTING SYSTEM INITIALIZATION ---")
+
+# 1.1 Generate Synthetic Data (Mock Dataset based on Engineering Principles)
+np.random.seed(42)
+n_samples = 1500  # Increased sample size for better academic visualization
+
+# Environmental and Equipment Variables
+transformer_age = np.random.uniform(1, 25, n_samples)  # Age in years
+ambient_temp = np.random.uniform(20, 50, n_samples)    # Temperature in Celsius
+grid_load = np.random.uniform(30, 100, n_samples)      # Load percentage
+
+# Weibull Distribution for Equipment Aging Risk
+beta_shape = 2.5
+eta_scale = 15.0
+weibull_risk = 1 - np.exp(-(transformer_age / eta_scale)**beta_shape)
+
+# Linear Combination (Logits)
+z = -15 + (0.2 * ambient_temp) + (0.1 * grid_load) + (8.0 * weibull_risk)
+
+# Sigmoid Activation for Probability
+outage_probability = 1 / (1 + np.exp(-z))
+outage_labels = (np.random.rand(n_samples) < outage_probability).astype(int)
+
+# Create DataFrame
+df_grid_data = pd.DataFrame({
+    'Transformer_Age': transformer_age,
+    'Ambient_Temp': ambient_temp,
+    'Grid_Load': grid_load,
+    'Weibull_Risk': weibull_risk,
+    'Outage_Status': outage_labels
+})
+
+# 1.2 Model Training & Evaluation
+X = df_grid_data[['Ambient_Temp', 'Grid_Load', 'Weibull_Risk']]
+y = df_grid_data['Outage_Status']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+clf_model = LogisticRegression()
+clf_model.fit(X_train, y_train)
+y_pred = clf_model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Model Training Completed. Validation Accuracy: {accuracy * 100:.2f}%\n")
+
+# 1.3 Data Visualization for Academic Paper
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+# Plot A: Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax1,
+            xticklabels=['Normal (0)', 'Outage (1)'],
+            yticklabels=['Normal (0)', 'Outage (1)'])
+ax1.set_title('Confusion Matrix: Outage Prediction', fontsize=12, fontweight='bold')
+ax1.set_ylabel('True Label')
+ax1.set_xlabel('Predicted Label')
+
+# Plot B: Learning Curve
+train_sizes, train_scores, test_scores = learning_curve(
+    clf_model, X, y, cv=5, scoring='accuracy', n_jobs=-1,
+    train_sizes=np.linspace(0.1, 1.0, 10)
+)
+train_mean, train_std = np.mean(train_scores, axis=1), np.std(train_scores, axis=1)
+test_mean, test_std = np.mean(test_scores, axis=1), np.std(test_scores, axis=1)
+
+ax2.plot(train_sizes, train_mean, label="Training Accuracy", color="blue", marker='o')
+ax2.fill_between(train_sizes, train_mean - train_std, train_mean + train_std, color="blue", alpha=0.15)
+ax2.plot(train_sizes, test_mean, label="Cross-Validation Accuracy", color="green", marker='s')
+ax2.fill_between(train_sizes, test_mean - test_std, test_mean + test_std, color="green", alpha=0.15)
+
+ax2.set_title("Learning Curve: Convergence Analysis", fontsize=12, fontweight='bold')
+ax2.set_xlabel("Number of Training Samples")
+ax2.set_ylabel("Accuracy Score")
+ax2.legend(loc="lower right")
+
+plt.tight_layout()
+plt.show()
+
+
+# =============================================================================
+# PART 2: AUTOMATED FAULT ISOLATION & SELF-HEALING (IEEE 33-BUS)
+# =============================================================================
+
+print("--- PART 2: FLISR & GRID RECONFIGURATION (IEEE 33-BUS) ---")
+
+# 2.1 Topology Definition
+main_lines = [
+    (1,2), (2,3), (3,4), (4,5), (5,6), (6,7), (7,8), (8,9), (9,10), 
+    (10,11), (11,12), (12,13), (13,14), (14,15), (15,16), (16,17), (17,18), 
+    (2,19), (19,20), (20,21), (21,22), 
+    (3,23), (23,24), (24,25), 
+    (6,26), (26,27), (27,28), (28,29), (29,30), (30,31), (31,32), (32,33)
+]
+tie_lines = [(8,21), (9,15), (12,22), (18,33), (25,29)]
+
+# Distributed Energy Resources (DERs)
+pv_nodes = [14, 24]       # 光 (Solar PV)
+battery_nodes = [21, 31]  # 储 (Battery Storage)
+ev_nodes = [8, 30]        # 充 (EV Charging Load)
+
+G_normal = nx.Graph()
+G_normal.add_edges_from(main_lines, state='closed', type='main')
+G_normal.add_nodes_from(range(1, 34))
+
+# 2.2 FLISR Algorithm implementation
+def simulate_flisr_reconfiguration(graph, fault_edge, available_ties):
+    print(f"[EVENT] Fault detected at branch: {fault_edge}")
+    G_healed = graph.copy()
+    
+    # Fault Isolation
+    if G_healed.has_edge(*fault_edge):
+        G_healed.remove_edge(*fault_edge)
+        print(f"[ISOLATION] Branch {fault_edge} successfully disconnected.")
+    
+    # Assess Connectivity
+    powered_from_main = nx.node_connected_component(G_healed, 1)
+    all_nodes = set(G_healed.nodes())
+    blackout_nodes = all_nodes - powered_from_main
+    
+    if not blackout_nodes:
+        return G_healed, None
+        
+    print(f"[ANALYSIS] Unpowered nodes identified: {sorted(list(blackout_nodes))}")
+    
+    # Self-Healing (Rerouting)
+    activated_tie = None
+    for u, v in available_ties:
+        if (u in powered_from_main and v in blackout_nodes) or (v in powered_from_main and u in blackout_nodes):
+            activated_tie = (u, v)
+            G_healed.add_edge(u, v, state='healed', type='tie')
+            print(f"[RESTORATION] Optimal tie line identified and closed: {activated_tie}")
+            
+            # Verify restoration
+            new_powered = nx.node_connected_component(G_healed, 1)
+            remaining_blackout = all_nodes - new_powered
+            
+            if not remaining_blackout:
+                print("[STATUS] 100% Load restored via primary grid routing.")
+            else:
+                islanding_sources = [n for n in remaining_blackout if n in battery_nodes or n in pv_nodes]
+                if islanding_sources:
+                    print(f"[ISLANDING] Nodes {sorted(list(remaining_blackout))} operating in Islanding Mode utilizing DERs at {islanding_sources}.")
+            break
+            
+    if not activated_tie:
+        print("[CRITICAL] Grid reconfiguration failed. No suitable tie line available.")
+        
+    return G_healed, activated_tie
+
+# Execute Simulation
+simulated_fault = (6, 26)
+G_healed, active_tie = simulate_flisr_reconfiguration(G_normal, simulated_fault, tie_lines)
+
+# 2.3 Graph Visualization (Topology Rendering)
+pos = nx.kamada_kawai_layout(G_normal)
+
+def get_node_colors(graph):
+    return [
+        'black' if n == 1 else
+        'gold' if n in pv_nodes else
+        'limegreen' if n in battery_nodes else
+        'tomato' if n in ev_nodes else 'lightblue'
+        for n in graph.nodes()
+    ]
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+
+# Plot A: Normal Topology
+nx.draw_networkx_nodes(G_normal, pos, ax=ax1, node_color=get_node_colors(G_normal), node_size=400, edgecolors='black')
+nx.draw_networkx_edges(G_normal, pos, ax=ax1, edgelist=main_lines, edge_color='gray', width=2)
+nx.draw_networkx_edges(G_normal, pos, ax=ax1, edgelist=tie_lines, edge_color='blue', style='dashed', width=1.5, alpha=0.4)
+nx.draw_networkx_labels(G_normal, pos, ax=ax1, font_size=8, font_weight='bold')
+ax1.set_title("Standard Topology (IEEE 33-Bus System + 光储充)", fontsize=13, fontweight='bold', pad=15)
+ax1.axis('off')
+
+# Plot B: Healed Topology
+nx.draw_networkx_nodes(G_healed, pos, ax=ax2, node_color=get_node_colors(G_healed), node_size=400, edgecolors='black')
+
+for u, v in G_normal.edges():
+    if (u, v) == simulated_fault or (v, u) == simulated_fault:
+        ax2.plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]], color='red', linestyle='dotted', linewidth=3)
+    else:
+        ax2.plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]], color='gray', linewidth=2)
+
+for u, v in tie_lines:
+    if (u, v) == active_tie or (v, u) == active_tie:
+        ax2.plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]], color='forestgreen', linewidth=4)
+    else:
+        ax2.plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]], color='blue', linestyle='dashed', linewidth=1.5, alpha=0.4)
+
+nx.draw_networkx_labels(G_healed, pos, ax=ax2, font_size=8, font_weight='bold')
+ax2.set_title("Post-Fault Reconfiguration (FLISR Execution)", fontsize=13, fontweight='bold', pad=15)
+ax2.axis('off')
+
+# Custom Legend
+legend_elements = [
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='black', markersize=9, label='Main Supply'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='gold', markersize=9, label='光 (Solar PV)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='limegreen', markersize=9, label='储 (Battery Storage)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='tomato', markersize=9, label='充 (EV Charging Load)'),
+    Line2D([0], [0], color='gray', lw=2, label='Active Main Line'),
+    Line2D([0], [0], color='red', lw=3, linestyle='dotted', label='Fault Location (Isolated)'),
+    Line2D([0], [0], color='forestgreen', lw=3, label='Activated Tie Line (Healed)')
+]
+fig.legend(handles=legend_elements, loc='lower center', ncol=7, fontsize=10, bbox_to_anchor=(0.5, 0.02))
+
+plt.tight_layout(rect=[0, 0.05, 1, 1])
+plt.show()
