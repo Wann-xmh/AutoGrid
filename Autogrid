@@ -225,4 +225,216 @@ legend_elements = [
 fig.legend(handles=legend_elements, loc='lower center', ncol=7, fontsize=10, bbox_to_anchor=(0.5, 0.02))
 
 plt.tight_layout(rect=[0, 0.05, 1, 1])
+plt.show() 
+
+# =============================================================================
+# PART 2.4: ADVANCED SCENARIO - MULTIPLE FAULTS AND CASCADING HEALING
+# =============================================================================
+
+print("\n--- ADVANCED SIMULATION: MULTIPLE FAULTS HANDLING ---")
+
+def simulate_multi_fault_flisr(graph, fault_edges, available_ties):
+    """
+    Simulates a severe grid event with multiple simultaneous faults.
+    The algorithm attempts to reroute power using multiple tie lines dynamically.
+    """
+    print(f"\n[MULTI-FAULT EVENT] Critical faults detected at branches: {fault_edges}")
+    G_healed = graph.copy()
+    
+    # 1. Fault Isolation: Disconnect all damaged branches
+    for u, v in fault_edges:
+        if G_healed.has_edge(u, v):
+            G_healed.remove_edge(u, v)
+            print(f"[ISOLATION] Branch {(u, v)} successfully disconnected.")
+        elif G_healed.has_edge(v, u): # Handle undirected edge reverse case
+            G_healed.remove_edge(v, u)
+            print(f"[ISOLATION] Branch {(v, u)} successfully disconnected.")
+    
+    # 2. Assess Initial Connectivity
+    powered_from_main = nx.node_connected_component(G_healed, 1)
+    all_nodes = set(G_healed.nodes())
+    blackout_nodes = all_nodes - powered_from_main
+    
+    if not blackout_nodes:
+        return G_healed, []
+        
+    print(f"[ANALYSIS] Initial unpowered nodes identified: {sorted(list(blackout_nodes))}")
+    
+    # 3. Dynamic Self-Healing (Multi-Rerouting via Tie Lines)
+    activated_ties = []
+    for u, v in available_ties:
+        current_powered = nx.node_connected_component(G_healed, 1)
+        current_blackout = all_nodes - current_powered
+        
+        if not current_blackout:
+            break  # Break loop if all nodes are successfully restored
+            
+        # If the tie line connects a powered zone to a blackout zone, close the switch
+        if (u in current_powered and v in current_blackout) or (v in current_powered and u in current_blackout):
+            activated_ties.append((u, v))
+            G_healed.add_edge(u, v, state='healed', type='tie')
+            print(f"[RESTORATION] Optimal tie line identified and closed: {(u, v)}")
+
+    # 4. Final Verification
+    final_powered = nx.node_connected_component(G_healed, 1)
+    final_blackout = all_nodes - final_powered
+    
+    if not final_blackout:
+        print("[STATUS] 100% Load restored via multi-path grid routing.")
+    else:
+        print(f"[STATUS] Restoration incomplete. Nodes {sorted(list(final_blackout))} remain isolated.")
+            
+    return G_healed, activated_ties
+
+# Execute Multi-Fault Simulation
+# Selected Case: Branch (6, 26) and Branch (14, 15) fail simultaneously
+# This specific case forces the algorithm to utilize exactly TWO distinct tie lines.
+simulated_multiple_faults = [(6, 26), (14, 15)]
+G_multi_healed, active_multi_ties = simulate_multi_fault_flisr(G_normal, simulated_multiple_faults, tie_lines)
+
+# =============================================================================
+# PART 2.5: ROBUST MULTI-FAULT TOPOLOGY VISUALIZATION
+# =============================================================================
+
+fig2, ax_multi = plt.subplots(figsize=(10, 7))
+
+# Draw Nodes
+nx.draw_networkx_nodes(G_multi_healed, pos, ax=ax_multi, node_color=get_node_colors(G_multi_healed), node_size=400, edgecolors='black')
+
+# Layer 1: Draw healthy main lines (Gray)
+edgelist_main = [e for e in G_multi_healed.edges() if G_multi_healed.edges[e].get('type') == 'main']
+nx.draw_networkx_edges(G_multi_healed, pos, ax=ax_multi, edgelist=edgelist_main, edge_color='gray', width=2)
+
+# Layer 2: Draw activated tie lines (Green)
+edgelist_tie = [e for e in G_multi_healed.edges() if G_multi_healed.edges[e].get('type') == 'tie']
+nx.draw_networkx_edges(G_multi_healed, pos, ax=ax_multi, edgelist=edgelist_tie, edge_color='forestgreen', width=4)
+
+# Layer 3: Draw the specific faults clearly (Red Dotted)
+nx.draw_networkx_edges(G_normal, pos, ax=ax_multi, edgelist=simulated_multiple_faults, edge_color='red', style='dotted', width=3)
+
+# Layer 4: Draw inactive tie lines (Blue Dashed)
+inactive_ties = [tie for tie in tie_lines if tie not in active_multi_ties and (tie[1], tie[0]) not in active_multi_ties]
+nx.draw_networkx_edges(G_normal, pos, ax=ax_multi, edgelist=inactive_ties, edge_color='blue', style='dashed', width=1.5, alpha=0.4)
+
+# Draw Node Labels
+nx.draw_networkx_labels(G_multi_healed, pos, ax=ax_multi, font_size=8, font_weight='bold')
+
+ax_multi.set_title("Advanced FLISR: Multiple Simultaneous Faults Reconfiguration", fontsize=14, fontweight='bold', pad=15)
+ax_multi.axis('off')
+
+# Render Custom Legend
+legend_elements = [
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='black', markersize=9, label='Main Supply'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='gold', markersize=9, label='光 (Solar PV)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='limegreen', markersize=9, label='储 (Battery Storage)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='tomato', markersize=9, label='充 (EV Charging Load)'),
+    Line2D([0], [0], color='gray', lw=2, label='Active Main Line'),
+    Line2D([0], [0], color='red', lw=3, linestyle='dotted', label='Fault Locations (Isolated)'),
+    Line2D([0], [0], color='forestgreen', lw=4, label='Activated Tie Lines (Healed)')
+]
+fig2.legend(handles=legend_elements, loc='lower center', ncol=4, fontsize=10, bbox_to_anchor=(0.5, 0.02))
+
+plt.tight_layout(rect=[0, 0.08, 1, 1])
+plt.show()
+
+# =============================================================================
+# PART 2.6: ROBUST ACADEMIC VISUALIZATION - BEFORE VS AFTER RESTORATION
+# =============================================================================
+
+print("\n--- GENERATING ACADEMIC COMPARISON PLOTS (UNDIRECTED SAFE) ---")
+
+# Step 1: Create the Isolated Graph (G_multi_isolated) without Rerouting Paths
+# This graph represents the state AFTER fault isolation but BEFORE tie line activation.
+G_multi_isolated = G_normal.copy()
+for u, v in simulated_multiple_faults:
+    # Handle undirected cases dynamically for safe removal
+    if G_multi_isolated.has_edge(u, v): G_multi_isolated.remove_edge(u, v)
+    elif G_multi_isolated.has_edge(v, u): G_multi_isolated.remove_edge(v, u)
+
+# Step 2: Define Color Logic for 'Before' vs 'After' States
+
+# Node Color Logic for Isolation Plot (Powered vs Blackout)
+# (Lightblue = Powered, Gray = Blackout)
+def get_node_colors_isolation(graph, source_node=1):
+    powered_component = nx.node_connected_component(graph, source_node)
+    colors = []
+    for n in graph.nodes():
+        if n == source_node: colors.append('black') # Main Supply node
+        elif n in powered_component: colors.append('lightblue') # Powered Area
+        else: colors.append('#AAB7B8') # Gray for Blackout Area
+    return colors
+
+# Step 3: Initialization of Visualization and Layout
+fig_compare, (ax_iso, ax_heal) = plt.subplots(1, 2, figsize=(18, 8))
+
+# Step 4: PLOT A - POST-FAULT ISOLATION (BLACKOUT ZONES)
+# This plot visually highlights the unpowered areas using gray coloring.
+
+# Layer 1: Draw Nodes with Isolation Color Logic (Gray Blackout)
+nx.draw_networkx_nodes(G_multi_isolated, pos, ax=ax_iso, 
+                        node_color=get_node_colors_isolation(G_multi_isolated), 
+                        node_size=400, edgecolors='black')
+
+# Layer 2: Draw Healthy Main Lines (Gray)
+nx.draw_networkx_edges(G_multi_isolated, pos, ax=ax_iso, edgelist=main_lines, edge_color='gray', width=2)
+
+# Layer 3: Draw Fault Locations (Isolated Branches) (Red Dotted)
+# We draw this using G_normal to ensure the specific fault branches are visualized.
+nx.draw_networkx_edges(G_normal, pos, ax=ax_iso, edgelist=simulated_multiple_faults, edge_color='red', style='dotted', width=3)
+
+# Layer 4: Draw Inactive Tie Lines (Blue Dashed) (All ties are dashed in this state)
+nx.draw_networkx_edges(G_normal, pos, ax=ax_iso, edgelist=tie_lines, edge_color='blue', style='dashed', width=1.5, alpha=0.4)
+
+nx.draw_networkx_labels(G_multi_isolated, pos, ax=ax_iso, font_size=8, font_weight='bold')
+ax_iso.set_title("Standard IEEE 33-Bus Topology\nPost-Fault Isolation (Blackout Zones identified in Gray)", fontsize=14, fontweight='bold', pad=15)
+ax_iso.axis('off')
+
+
+# Step 5: PLOT B - POST-HEALING RESTORATION
+# This plot highlights the successful rerouting using thick green lines.
+
+# Layer 1: Draw Nodes with Standard Status Colors (including DER status)
+nx.draw_networkx_nodes(G_multi_healed, pos, ax=ax_heal, node_color=get_node_colors(G_multi_healed), node_size=400, edgecolors='black')
+
+# Layer 2: Draw Healthy Main Lines (Gray)
+edgelist_main_healed = [e for e in G_multi_healed.edges() if G_multi_healed.edges[e].get('type') == 'main']
+nx.draw_networkx_edges(G_multi_healed, pos, ax=ax_heal, edgelist=edgelist_main_healed, edge_color='gray', width=2)
+
+# Layer 3: Draw Activated Tie Lines (Healed Paths) (Green Thick)
+edgelist_tie_activated = [e for e in G_multi_healed.edges() if G_multi_healed.edges[e].get('type') == 'tie']
+nx.draw_networkx_edges(G_multi_healed, pos, ax=ax_heal, edgelist=edgelist_tie_activated, edge_color='forestgreen', width=4)
+
+# Layer 4: Draw Fault Locations (Isolated Branches) (Red Dotted)
+nx.draw_networkx_edges(G_normal, pos, ax=ax_heal, edgelist=simulated_multiple_faults, edge_color='red', style='dotted', width=3)
+
+# Layer 5: Draw Inactive Tie Lines (Blue Dashed)
+# Generate the set of ties not used in healing to draw them faintly.
+active_multi_set = {tuple(sorted(t)) for t in active_multi_ties} # Undirected safe set
+inactive_ties_multi = [tie for tie in tie_lines if tuple(sorted(tie)) not in active_multi_set]
+nx.draw_networkx_edges(G_normal, pos, ax=ax_heal, edgelist=inactive_ties_multi, edge_color='blue', style='dashed', width=1.5, alpha=0.4)
+
+nx.draw_networkx_labels(G_multi_healed, pos, ax=ax_heal, font_size=8, font_weight='bold')
+ax_heal.set_title("Cascading Healing and Multi-Path Rerouting\nPost-Restoration (Power restored via Forest Green tie lines)", fontsize=14, fontweight='bold', pad=15)
+ax_heal.axis('off')
+
+# Step 6: Render Academic Custom Legend (Positioned centrally under both plots)
+legend_elements_iso = [
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='black', markersize=9, label='Main Supply'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='lightblue', markersize=9, label='Powered Node'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='#AAB7B8', markersize=9, label='Blackout Node (Isolated)'),
+    Line2D([0], [0], color='gray', lw=2, label='Active Main Line'),
+    Line2D([0], [0], color='red', lw=3, linestyle='dotted', label='Fault Location (Isolated)'),
+    Line2D([0], [0], color='blue', lw=1.5, linestyle='dashed', label='Open Tie Switch (Inactive)'),
+    Line2D([0], [0], color='forestgreen', lw=4, label='Activated Tie Line (Healed)')
+]
+# Legend for Islanding Mode in Post-Healing
+legend_elements_DERs = [
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='gold', markersize=9, label='光 (Solar PV)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='limegreen', markersize=9, label='储 (Battery Storage)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='tomato', markersize=9, label='充 (EV Charging Load)'),
+]
+all_legend_elements = legend_elements_iso + legend_elements_DERs
+fig_compare.legend(handles=all_legend_elements, loc='lower center', ncol=5, fontsize=10, bbox_to_anchor=(0.5, 0.02))
+
+plt.tight_layout(rect=[0, 0.08, 1, 1])
 plt.show()
