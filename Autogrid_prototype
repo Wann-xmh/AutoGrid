@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoGrid — AI-Powered Grid Dual-Engine Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --void:#0a0c10;
+    --panel:#12151c;
+    --panel-2:#161a22;
+    --line:#242a34;
+    --text:#e8eaed;
+    --text-dim:#8b95a5;
+    --text-faint:#5a6472;
+    --fault:#e4483b;
+    --restore:#34d399;
+    --amber:#f5a623;
+    --battery:#4fa8e0;
+    --ev:#b084f5;
+    --supply:#ffffff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--void);
+    color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+
+  /* ---------- background circuit texture ---------- */
+  .grain{
+    position:fixed;inset:0;pointer-events:none;z-index:1;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:64px 64px;
+    opacity:.12;
+  }
+
+  /* ---------- nav ---------- */
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:20px 40px;
+    background:rgba(10,12,16,.7);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:.02em;}
+  .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--restore);box-shadow:0 0 12px var(--restore);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .navlinks{display:flex;gap:32px;font-size:13px;color:var(--text-dim);letter-spacing:.04em;text-transform:uppercase;}
+  .navlinks a{text-decoration:none;transition:color .2s;}
+  .navlinks a:hover{color:var(--restore);}
+  @media(max-width:780px){.navlinks{display:none;}}
+
+  /* ---------- hero ---------- */
+  .hero{
+    min-height:100vh;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:140px 40px 60px;
+    position:relative;
+    max-width:1200px;margin:0 auto;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--restore);margin-bottom:22px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow::before{content:'';width:24px;height:1px;background:var(--restore);}
+  .hero h1{
+    font-size:clamp(38px,6vw,74px);
+    line-height:1.02;
+    font-weight:700;
+    letter-spacing:-.02em;
+    max-width:900px;
+  }
+  .hero h1 .accent{color:var(--restore);}
+  .hero p{
+    margin-top:26px;max-width:640px;font-size:17px;line-height:1.65;color:var(--text-dim);
+  }
+  .hero-actions{margin-top:38px;display:flex;gap:16px;flex-wrap:wrap;}
+  .btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;letter-spacing:.04em;
+    padding:14px 26px;border-radius:2px;
+    border:1px solid var(--line);
+    background:transparent;color:var(--text);
+    cursor:pointer;transition:all .2s;
+    text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+  }
+  .btn:hover{border-color:var(--restore);color:var(--restore);}
+  .btn.primary{background:var(--restore);color:#06110d;border-color:var(--restore);font-weight:600;}
+  .btn.primary:hover{background:#5eead4;color:#06110d;}
+
+  .ticker{
+    margin-top:56px;padding-top:26px;border-top:1px solid var(--line);
+    display:flex;gap:48px;flex-wrap:wrap;
+  }
+  .ticker .stat .num{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:600;}
+  .ticker .stat .lbl{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;}
+
+  /* ---------- section shell ---------- */
+  section{position:relative;z-index:2;padding:100px 40px;max-width:1200px;margin:0 auto;}
+  .section-head{margin-bottom:48px;max-width:680px;}
+  .section-head .eyebrow{margin-bottom:14px;}
+  .section-head h2{font-size:clamp(26px,3.4vw,38px);font-weight:600;letter-spacing:-.01em;}
+  .section-head p{margin-top:14px;color:var(--text-dim);font-size:15px;line-height:1.6;}
+
+  /* ---------- demo panel ---------- */
+  .demo-shell{
+    border:1px solid var(--line);background:var(--panel);border-radius:4px;overflow:hidden;
+  }
+  .demo-top{display:grid;grid-template-columns:1fr 340px;min-height:560px;}
+  @media(max-width:920px){.demo-top{grid-template-columns:1fr;}}
+  #cityCanvas{width:100%;height:100%;display:block;background:radial-gradient(circle at 50% 30%, #10141b 0%, #090b0f 70%);}
+  .canvas-wrap{position:relative;min-height:420px;}
+  .canvas-hint{
+    position:absolute;bottom:14px;left:14px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+    color:var(--text-faint);letter-spacing:.03em;pointer-events:none;
+  }
+  .legend{
+    position:absolute;top:14px;left:14px;display:flex;flex-direction:column;gap:6px;
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-dim);
+    background:rgba(10,12,16,.55);padding:10px 12px;border:1px solid var(--line);border-radius:3px;
+  }
+  .legend .row{display:flex;align-items:center;gap:8px;}
+  .legend .sw{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+
+  .side-panel{
+    border-left:1px solid var(--line);display:flex;flex-direction:column;
+  }
+  .side-panel .block{padding:20px 22px;border-bottom:1px solid var(--line);}
+  .side-panel .block:last-child{border-bottom:none;flex:1;}
+  .side-panel h4{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);margin-bottom:12px;}
+
+  .gauge-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .gauge-row .val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;}
+  .gauge-track{height:6px;background:#1c2029;border-radius:3px;overflow:hidden;margin-bottom:14px;}
+  .gauge-fill{height:100%;border-radius:3px;transition:width .6s ease;}
+
+  .rca-bar{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text-dim);margin-bottom:8px;}
+  .rca-bar .label{width:56px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+  .rca-bar .track{flex:1;height:5px;background:#1c2029;border-radius:3px;overflow:hidden;}
+  .rca-bar .fill{height:100%;border-radius:3px;transition:width .6s ease;}
+  .rca-bar .pct{width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;}
+
+  .eq-line{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-dim);margin-bottom:4px;}
+  .eq-line .v{color:var(--restore);}
+
+  .strategy-box{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.6;padding:12px;
+    background:#0c0e13;border:1px solid var(--line);border-radius:3px;color:var(--text-dim);min-height:52px;
+  }
+  .strategy-box.active{border-color:var(--amber);color:var(--amber);}
+
+  .console{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:1.7;color:var(--text-faint);
+    overflow-y:auto;max-height:150px;
+  }
+  .console .l{white-space:pre-wrap;}
+  .console .l.new{color:var(--restore);}
+  .console .l.warn{color:var(--fault);}
+
+  .demo-controls{
+    display:flex;gap:1px;background:var(--line);border-top:1px solid var(--line);
+  }
+  .ctrl-btn{
+    flex:1;background:var(--panel);border:none;color:var(--text);padding:18px 14px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.03em;cursor:pointer;
+    display:flex;flex-direction:column;align-items:flex-start;gap:3px;transition:background .2s;
+  }
+  .ctrl-btn:hover:not(:disabled){background:var(--panel-2);}
+  .ctrl-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .ctrl-btn .step{color:var(--text-faint);font-size:10px;}
+  .ctrl-btn.step1{border-top:2px solid var(--amber);}
+  .ctrl-btn.step2{border-top:2px solid var(--fault);}
+  .ctrl-btn.step3{border-top:2px solid var(--restore);}
+  .ctrl-btn.reset{border-top:2px solid var(--text-faint);max-width:150px;flex:0 0 150px;}
+
+  .selected-chips{
+    position:absolute;bottom:14px;right:14px;display:flex;flex-wrap:wrap;gap:6px;max-width:60%;justify-content:flex-end;
+  }
+  .chip{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--fault);
+    background:rgba(228,72,59,.12);border:1px solid var(--fault);border-radius:20px;
+    padding:4px 10px;display:flex;align-items:center;gap:6px;
+  }
+  .chip button{background:none;border:none;color:var(--fault);cursor:pointer;font-family:inherit;font-size:11px;padding:0;line-height:1;}
+
+  /* ---------- solution modal ---------- */
+  .modal-backdrop{
+    display:none;position:fixed;inset:0;z-index:100;background:rgba(6,7,10,.78);backdrop-filter:blur(4px);
+    align-items:center;justify-content:center;padding:24px;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    width:100%;max-width:640px;max-height:82vh;overflow-y:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    box-shadow:0 30px 80px rgba(0,0,0,.6);
+  }
+  .modal-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:20px 26px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);
+  }
+  .modal-head h3{font-size:18px;}
+  .modal-close{background:none;border:1px solid var(--line);color:var(--text-dim);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:7px 12px;border-radius:2px;cursor:pointer;}
+  .modal-close:hover{border-color:var(--fault);color:var(--fault);}
+  .modal-body{padding:24px 26px;}
+  .solution-card{
+    border:1px solid var(--line);border-radius:4px;padding:16px 18px;margin-bottom:14px;background:#0c0e13;
+  }
+  .solution-card .sc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .solution-card .sc-head .bus{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;}
+  .solution-card .sc-head .tag{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 9px;border-radius:20px;letter-spacing:.03em;
+  }
+  .tag.restored{background:rgba(52,211,153,.14);color:var(--restore);border:1px solid var(--restore);}
+  .tag.islanded{background:rgba(245,166,35,.14);color:var(--amber);border:1px solid var(--amber);}
+  .tag.dark{background:rgba(228,72,59,.14);color:var(--fault);border:1px solid var(--fault);}
+  .solution-card .sc-row{font-size:12.5px;color:var(--text-dim);line-height:1.7;}
+  .solution-card .sc-row b{color:var(--text);font-weight:500;}
+  .modal-summary{
+    display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:20px;
+  }
+  .modal-summary div{background:var(--panel-2);padding:14px 16px;}
+  .modal-summary .num{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;}
+  .modal-summary .lbl{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+  .violation-list{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--fault);line-height:1.8;}
+
+  /* ---------- methodology cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);}
+  @media(max-width:860px){.cards{grid-template-columns:1fr;}}
+  .card{background:var(--panel);padding:30px 26px;}
+  .card .idx{font-family:'IBM Plex Mono',monospace;color:var(--text-faint);font-size:12px;margin-bottom:16px;}
+  .card h3{font-size:18px;margin-bottom:10px;}
+  .card p{font-size:13.5px;color:var(--text-dim);line-height:1.65;margin-bottom:14px;}
+  .card .eq{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:#0c0e13;border:1px solid var(--line);padding:12px;border-radius:3px;color:var(--restore);}
+
+  /* ---------- case study ---------- */
+  .case-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:60px;align-items:start;}
+  @media(max-width:860px){.case-grid{grid-template-columns:1fr;gap:32px;}}
+  .case-grid p{color:var(--text-dim);font-size:15px;line-height:1.75;margin-bottom:16px;}
+  .case-stats{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);}
+  .case-stat{padding:22px 24px;border-bottom:1px solid var(--line);}
+  .case-stat:last-child{border-bottom:none;}
+  .case-stat .num{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:600;color:var(--fault);}
+  .case-stat .num.good{color:var(--restore);}
+  .case-stat .lbl{font-size:12px;color:var(--text-faint);margin-top:6px;letter-spacing:.02em;}
+
+  /* ---------- matrix table ---------- */
+  table.matrix{width:100%;border-collapse:collapse;border:1px solid var(--line);font-size:13.5px;}
+  table.matrix th{
+    text-align:left;padding:14px 18px;background:var(--panel-2);color:var(--text-faint);
+    font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    border-bottom:1px solid var(--line);
+  }
+  table.matrix td{padding:16px 18px;border-bottom:1px solid var(--line);color:var(--text-dim);vertical-align:top;}
+  table.matrix tr:last-child td{border-bottom:none;}
+  table.matrix td.cause{color:var(--text);font-weight:500;}
+
+  /* ---------- code section ---------- */
+  .code-shell{
+    border:1px solid var(--line);background:var(--panel);border-radius:4px;
+    display:grid;grid-template-columns:1fr auto;gap:20px;padding:34px 36px;align-items:center;
+  }
+  @media(max-width:700px){.code-shell{grid-template-columns:1fr;}}
+  .code-shell h3{font-size:20px;margin-bottom:8px;}
+  .code-shell p{color:var(--text-dim);font-size:14px;line-height:1.6;max-width:520px;}
+  .repo-path{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--restore);margin-top:10px;display:block;}
+
+  footer{
+    border-top:1px solid var(--line);padding:44px 40px;max-width:1200px;margin:0 auto;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;
+    font-size:12.5px;color:var(--text-faint);
+  }
+  footer .authors{line-height:1.8;}
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+
+<nav>
+  <div class="logo"><span class="dot"></span>AUTOGRID</div>
+  <div class="navlinks">
+    <a href="#demo">Live Demo</a>
+    <a href="#methodology">Methodology</a>
+    <a href="#case-study">Case Study</a>
+    <a href="#matrix">Strategy Matrix</a>
+    <a href="#code">Code</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="eyebrow">Dual-Engine AI Grid Framework</div>
+  <h1>Predict the failure.<br>Isolate the fault.<br><span class="accent">Heal the grid — in milliseconds.</span></h1>
+  <p>An interactive prototype of the AI-Powered Grid framework: Weibull-based equipment aging and Logistic Regression fused into a proactive risk engine, paired with a Breadth-First Search reconfiguration engine running on the real IEEE 33-bus topology. Below, the city is the grid — every building is a bus node.</p>
+  <div class="hero-actions">
+    <a href="#demo" class="btn primary">Run the simulation ↓</a>
+    <a href="https://github.com/Wann-xmh/AutoGrid/blob/main/Autogrid" target="_blank" class="btn">View source on GitHub ↗</a>
+  </div>
+  <div class="ticker">
+    <div class="stat"><div class="num mono">85.33%</div><div class="lbl">Outage prediction accuracy</div></div>
+    <div class="stat"><div class="num mono">33</div><div class="lbl">Bus IEEE test feeder</div></div>
+    <div class="stat"><div class="num mono">&lt;1ms</div><div class="lbl">Reconfiguration response</div></div>
+    <div class="stat"><div class="num mono">2025</div><div class="lbl">Cuba blackout, validated</div></div>
+  </div>
+</header>
+
+<section id="demo">
+  <div class="section-head">
+    <div class="eyebrow">01 — Interactive Prototype</div>
+    <h2>Break it yourself. Watch it heal.</h2>
+    <p>This city block is a 1:1 render of the paper's IEEE 33-bus feeder (Table II), augmented with DER nodes. Click any building to mark its equipment as faulted — pick one bus or several at once — then activate self-healing and get a bus-by-bus solution report, checked against IEEE voltage and thermal-current limits.</p>
+  </div>
+
+  <div class="demo-shell">
+    <div class="demo-top">
+      <div class="canvas-wrap">
+        <canvas id="cityCanvas"></canvas>
+        <div class="legend">
+          <div class="row"><span class="sw" style="background:#ffffff"></span>Main supply (bus 1)</div>
+          <div class="row"><span class="sw" style="background:#5b6472"></span>Normal bus</div>
+          <div class="row"><span class="sw" style="background:#e4483b"></span>Selected / faulted bus</div>
+          <div class="row"><span class="sw" style="background:#333844"></span>Blacked-out (unreachable)</div>
+          <div class="row"><span class="sw" style="background:#34d399"></span>Restored via tie-line</div>
+          <div class="row"><span class="sw" style="background:#f5a623"></span>Islanded on local DER</div>
+        </div>
+        <div class="canvas-hint">click a building to mark a fault · drag to orbit · scroll to zoom</div>
+        <div class="selected-chips" id="selectedChips"></div>
+      </div>
+      <div class="side-panel">
+        <div class="block">
+          <h4>Fault Selection</h4>
+          <div id="selectionSummary" class="mono" style="font-size:12.5px;color:var(--text-dim);line-height:1.7;">No buses selected. Click buildings in the city to mark broken equipment.</div>
+        </div>
+        <div class="block">
+          <h4>Line &amp; Voltage Compliance</h4>
+          <div class="gauge-row"><span>Buses within ±5% voltage band</span><span class="val mono" id="voltCompliance">33/33</span></div>
+          <div class="gauge-track"><div class="gauge-fill" id="voltFill" style="width:100%;background:var(--restore)"></div></div>
+          <div class="gauge-row"><span>Branches within thermal rating</span><span class="val mono" id="currCompliance">—/—</span></div>
+          <div class="gauge-track"><div class="gauge-fill" id="currFill" style="width:100%;background:var(--restore)"></div></div>
+          <div class="eq-line" style="margin-top:8px;">Limits: 0.95 ≤ V ≤ 1.05 pu · |I_ij| ≤ I_ij,max (Eq. 5)</div>
+        </div>
+        <div class="block">
+          <h4>SCADA Event Log</h4>
+          <div class="console" id="console">
+            <div class="l">&gt; system idle. all 33 buses nominal.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-controls">
+      <button class="ctrl-btn step2" id="btnCuba"><span class="step">PRESET</span>Load Cuba-Style Scenario (bus 15 &amp; 26)</button>
+      <button class="ctrl-btn step3" id="btnHeal" disabled><span class="step">SELF-HEALING</span>Activate Self-Healing (BFS + FLISR)</button>
+      <button class="ctrl-btn reset" id="btnClear">Clear Faults</button>
+      <button class="ctrl-btn reset" id="btnReset">Reset Grid</button>
+    </div>
+  </div>
+</section>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Self-Healing Report</h3>
+      <button class="modal-close" id="modalClose">Close ✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<section id="methodology">
+  <div class="section-head">
+    <div class="eyebrow">02 — Methodology</div>
+    <h2>Three mathematical layers, one pipeline</h2>
+    <p>Each layer is computationally lightweight by design — logistic regression, closed-form Weibull CDFs, and standard graph search — so the framework runs on existing SCADA/DMS hardware with no new capital investment.</p>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <div class="idx">Layer 01</div>
+      <h3>Degradation &amp; Risk Modeling</h3>
+      <p>Transformer aging is modeled with the Weibull CDF (β &gt; 1, wear-out phase), fitted from IEEE historical failure data. Ambient temperature, grid load, and Weibull risk feed a logistic classifier for outage probability.</p>
+      <div class="eq">Wrisk(t) = 1 − e^-(t/η)^β<br>ρ(outage) = 1 / (1 + e^-Z)</div>
+    </div>
+    <div class="card">
+      <div class="idx">Layer 02</div>
+      <h3>Graph Reconfiguration</h3>
+      <p>On fault detection, a BFS traversal over the bus adjacency matrix instantly isolates the compromised branch. A constrained optimizer selects tie-switches that maximize restored critical load per switching operation.</p>
+      <div class="eq">f_max = Σ ωᵢPᵢ − λN_sw<br>|I_ij| ≤ I_ij,max</div>
+    </div>
+    <div class="card">
+      <div class="idx">Layer 03</div>
+      <h3>Root Cause Diagnosis</h3>
+      <p>The linear score Z is disaggregated into thermal, load, and aging contributions, normalized, and ranked — producing an interpretable, single-cause diagnostic alert operators can act on immediately.</p>
+      <div class="eq">Cᵢ = β·factorᵢ<br>RootCause = argmax(C_temp, C_load, C_age)</div>
+    </div>
+  </div>
+</section>
+
+<section id="case-study">
+  <div class="section-head">
+    <div class="eyebrow">03 — Validation</div>
+    <h2>The 2025 Cuba National Grid failure</h2>
+  </div>
+  <div class="case-grid">
+    <div>
+      <p>A single-point failure at Diezmero Substation cascaded into a nationwide blackout — the defining case study for why prediction, isolation, and restoration can no longer be solved as three separate problems.</p>
+      <p>Without proactive monitoring, aging equipment and insufficient maintenance at Diezmero went undetected until the transformer or switchgear failed outright. The interconnected system had no automated way to isolate the compromised section, so the fault propagated unchecked across the island.</p>
+      <p>The framework demoed above addresses each failure point directly: Weibull + logistic scoring would have flagged Diezmero as high-risk ahead of time; BFS-driven FLISR would have isolated the fault and rerouted critical loads through DERs before cascade — the same sequence you just triggered on the city grid.</p>
+    </div>
+    <div class="case-stats">
+      <div class="case-stat"><div class="num">20 hrs</div><div class="lbl">Peak daily outages in affected regions, late 2024</div></div>
+      <div class="case-stat"><div class="num">1</div><div class="lbl">Single point of failure — Diezmero substation</div></div>
+      <div class="case-stat"><div class="num good">↓ SAIDI</div><div class="lbl">Projected reduction via automated FLISR + islanding</div></div>
+      <div class="case-stat"><div class="num good">0 manual</div><div class="lbl">Operator interventions required for reconfiguration</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="matrix">
+  <div class="section-head">
+    <div class="eyebrow">04 — Decision Logic</div>
+    <h2>Strategy Action Matrix</h2>
+    <p>Table I from the paper — the automated response the control logic selects once a root cause is identified.</p>
+  </div>
+  <table class="matrix">
+    <thead><tr><th>State</th><th>Dominant Cause</th><th>Strategy Action</th></tr></thead>
+    <tbody>
+      <tr><td>High outage risk</td><td class="cause">Thermal stress dominant</td><td>Isolate stressed branch and execute BFS tie-line rerouting; issue thermal overload warning for immediate operator response.</td></tr>
+      <tr><td>High outage risk</td><td class="cause">Aging risk dominant</td><td>Prioritize preventive isolation and maintenance scheduling; keep restoration path prepared for rapid switching.</td></tr>
+      <tr><td>Faulted &amp; isolated area</td><td class="cause">Local DER available</td><td>Trigger islanding mode and supply critical local loads via Solar PV and battery resources.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="code">
+  <div class="section-head">
+    <div class="eyebrow">05 — Implementation</div>
+    <h2>The prototype runs on the real algorithm</h2>
+  </div>
+  <div class="code-shell">
+    <div>
+      <h3>Predictive Analytics Engine · RCA Module · IEEE 33-Bus Self-Healing Simulation</h3>
+      <p>The full Python source — logistic regression training, Weibull fitting, and the BFS self-healing simulation on the IEEE 33-bus system — is public. This page's tie-switch logic (branches 6–26, 14–15 → ties 9–15, 18–33) mirrors the reconfiguration paths described in Section V of the paper.</p>
+      <span class="repo-path">github.com/Wann-xmh/AutoGrid/blob/main/Autogrid</span>
+    </div>
+    <a class="btn primary" href="https://github.com/Wann-xmh/AutoGrid/blob/main/Autogrid" target="_blank">Open repository ↗</a>
+  </div>
+</section>
+
+<footer>
+  <div class="authors">
+    Jaroenpompong · Senjaya · Mao · Yu (corresponding author)<br>
+    Tsinghua University — Depts. of Automation &amp; Electrical Engineering, School of Economics and Management
+  </div>
+  <div>
+    Funded by State Grid R&amp;D Program of China (kjgw2024-008) &amp; Tsinghua SRT Program (2621T0279)<br>
+    Prototype interface — not affiliated with the IEEE.
+  </div>
+</footer>
+
+<script>
+/* =========================================================
+   IEEE 33-BUS TOPOLOGY  (Table II of the paper)
+   ========================================================= */
+const treeEdges = [
+  [1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],
+  [12,13],[13,14],[14,15],[15,16],[16,17],[17,18],
+  [2,19],[19,20],[20,21],[21,22],
+  [3,23],[23,24],[24,25],
+  [6,26],[26,27],[27,28],[28,29],[29,30],[30,31],[31,32],[32,33]
+];
+// Branch resistance/reactance (Ω), same order as treeEdges — Table II of the paper
+const branchParams = [
+  [0.0922,0.0470],[0.4930,0.2512],[0.3661,0.1864],[0.3811,0.1941],[0.8190,0.7070],
+  [0.1872,0.6188],[0.7115,0.2351],[1.0299,0.7400],[1.0440,0.7400],[0.1967,0.0651],
+  [0.3744,0.1298],[1.4680,1.1549],[0.5416,0.7129],[0.5909,0.5260],[0.7462,0.5449],
+  [1.2889,1.7210],[0.7320,0.5739],[0.1640,0.1565],[1.5042,1.3555],[0.4095,0.4784],
+  [0.7089,0.9373],[0.4512,0.3084],[0.8980,0.7091],[0.8959,0.7071],[0.2031,0.1034],
+  [0.2842,0.1447],[1.0589,0.9338],[0.8043,0.7006],[0.5074,0.2585],[0.9745,0.9629],
+  [0.3105,0.3619],[0.3411,0.5302]
+];
+function edgeKey(a,b){ return [a,b].sort((x,y)=>x-y).join('-'); }
+const branchRX = {};
+treeEdges.forEach(([a,b],i)=>{ branchRX[edgeKey(a,b)] = {r:branchParams[i][0], x:branchParams[i][1]}; });
+
+// 5 standard normally-open tie switches for the IEEE 33-bus feeder (impedance assumed for this prototype — not published in the paper)
+const tieEdges = [[8,21],[9,15],[12,22],[18,33],[25,29]];
+tieEdges.forEach(([a,b])=>{ branchRX[edgeKey(a,b)] = {r:0.5, x:0.5}; });
+
+const derMap = {18:'solar', 25:'solar', 33:'battery', 22:'ev'};
+const derColor = {solar:0xf5a623, battery:0x4fa8e0, ev:0xb084f5};
+
+// Illustrative IEEE 33-bus loading (standard benchmark values, kW / kVAr) — bus 1 is the substation slack bus
+const loadData = {
+  1:[0,0],2:[100,60],3:[90,40],4:[120,80],5:[60,30],6:[60,20],7:[200,100],8:[200,100],
+  9:[60,20],10:[60,20],11:[45,30],12:[60,35],13:[60,35],14:[120,80],15:[60,10],16:[60,20],
+  17:[60,20],18:[90,40],19:[90,40],20:[90,40],21:[90,40],22:[90,40],23:[90,50],24:[420,200],
+  25:[420,200],26:[60,25],27:[60,25],28:[60,20],29:[120,70],30:[200,100],31:[150,70],
+  32:[210,100],33:[60,40]
+};
+const Vbase = 12.66; // kV — standard IEEE 33-bus base voltage
+const VMIN = 0.95, VMAX = 1.05; // per-unit ANSI-style service band, per Eq. 5's voltage-limit constraint
+
+/* ---- build adjacency + tree layout (radial fan, like Fig.3) ---- */
+const children = {};
+treeEdges.forEach(([a,b])=>{ (children[a]=children[a]||[]).push(b); });
+const parentOf = {};
+treeEdges.forEach(([a,b])=>{ parentOf[b] = a; });
+const allNodeIds = Object.keys(loadData).map(Number);
+function subtreeSize(n){
+  if(!children[n]) return 1;
+  return 1 + children[n].reduce((s,c)=>s+subtreeSize(c),0);
+}
+const positions = {1:{x:0,z:0,depth:0}};
+function layout(node, depth, aStart, aEnd){
+  const kids = children[node]||[];
+  if(kids.length===0) return;
+  let cursor = aStart;
+  const total = kids.reduce((s,k)=>s+subtreeSize(k),0);
+  kids.forEach(k=>{
+    const size = subtreeSize(k);
+    const span = (aEnd-aStart)*(size/total);
+    const angle = cursor + span/2;
+    const radius = (depth+1)*15;
+    positions[k] = {x: radius*Math.sin(angle), z: -radius*Math.cos(angle), depth: depth+1};
+    layout(k, depth+1, cursor, cursor+span);
+    cursor += span;
+  });
+}
+layout(1, 0, -1.15, 1.15);
+
+/* =========================================================
+   THREE.JS SCENE
+   ========================================================= */
+const canvas = document.getElementById('cityCanvas');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0c10, 0.0055);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 2000);
+let camDist = 340, camTheta = 0.55, camPhi = 1.05;
+function updateCamera(){
+  camera.position.set(
+    camDist*Math.sin(camPhi)*Math.sin(camTheta),
+    camDist*Math.cos(camPhi),
+    camDist*Math.sin(camPhi)*Math.cos(camTheta)
+  );
+  camera.lookAt(0, 10, -60);
+}
+updateCamera();
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+
+const ambient = new THREE.AmbientLight(0x8899bb, 0.55);
+scene.add(ambient);
+const key = new THREE.DirectionalLight(0xffffff, 0.5);
+key.position.set(80,140,60);
+scene.add(key);
+
+// ground grid
+const grid = new THREE.GridHelper(700, 70, 0x1c2230, 0x151a22);
+grid.position.y = -0.2;
+scene.add(grid);
+const groundMat = new THREE.MeshBasicMaterial({color:0x0b0d12});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(900,900), groundMat);
+ground.rotation.x = -Math.PI/2; ground.position.y = -0.5;
+scene.add(ground);
+
+// building meshes per node
+const nodeMeshes = {};
+const heightSeed = {};
+Object.keys(positions).forEach(k=>{ heightSeed[k] = 6 + (parseInt(k)*37 % 22); });
+
+function baseColor(n){
+  if(n==1) return 0xffffff;
+  if(derMap[n]) return derColor[derMap[n]];
+  return 0x5b6472;
+}
+
+const selectionRings = {};
+Object.entries(positions).forEach(([n,p])=>{
+  const h = heightSeed[n];
+  const w = n==1 ? 6 : 4.2;
+  const geo = new THREE.BoxGeometry(w, h, w);
+  const mat = new THREE.MeshStandardMaterial({
+    color: baseColor(n), emissive: baseColor(n), emissiveIntensity: 0.35,
+    roughness:0.5, metalness:0.15
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(p.x, h/2, p.z);
+  mesh.userData.busId = parseInt(n);
+  scene.add(mesh);
+  nodeMeshes[n] = {mesh, mat, h, base: baseColor(n)};
+
+  // selection ring — shown when a bus is marked as faulted
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(w*0.95, 0.35, 8, 24),
+    new THREE.MeshBasicMaterial({color:0xe4483b})
+  );
+  ring.rotation.x = Math.PI/2;
+  ring.position.set(p.x, 0.4, p.z);
+  ring.visible = false;
+  scene.add(ring);
+  selectionRings[n] = ring;
+
+  // DER marker (small glowing sphere on roof)
+  if(derMap[n]){
+    const s = new THREE.Mesh(new THREE.SphereGeometry(1.4,12,12), new THREE.MeshBasicMaterial({color:derColor[derMap[n]]}));
+    s.position.set(p.x, h+2.4, p.z);
+    scene.add(s);
+  }
+});
+
+// power lines
+const lineObjs = {};
+function makeLine(a,b,color,dashed){
+  const pa = positions[a], pb = positions[b];
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(pa.x, 1, pa.z),
+    new THREE.Vector3(pb.x, 1, pb.z)
+  ]);
+  const mat = dashed
+    ? new THREE.LineDashedMaterial({color, dashSize:2, gapSize:1.4, transparent:true, opacity:.55})
+    : new THREE.LineBasicMaterial({color, linewidth:1});
+  const line = new THREE.Line(geo, mat);
+  if(dashed) line.computeLineDistances();
+  scene.add(line);
+  return {line, mat};
+}
+treeEdges.forEach(([a,b])=>{
+  lineObjs[edgeKey(a,b)] = makeLine(a,b,0x3a4150,false);
+});
+tieEdges.forEach(([a,b])=>{
+  lineObjs[edgeKey(a,b)] = makeLine(a,b,0x2a3038,true);
+});
+
+/* ---------- orbit-style manual controls + click-to-select ---------- */
+let dragging=false, lastX=0, lastY=0, downX=0, downY=0;
+canvas.addEventListener('pointerdown', e=>{dragging=true; lastX=e.clientX; lastY=e.clientY; downX=e.clientX; downY=e.clientY;});
+window.addEventListener('pointerup', e=>{
+  dragging=false;
+  const moved = Math.hypot(e.clientX-downX, e.clientY-downY);
+  if(moved < 5 && e.target===canvas) handleCanvasClick(e);
+});
+window.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  camTheta += (e.clientX-lastX)*0.005;
+  camPhi = Math.min(1.45, Math.max(0.35, camPhi - (e.clientY-lastY)*0.004));
+  lastX=e.clientX; lastY=e.clientY;
+  updateCamera();
+});
+canvas.addEventListener('wheel', e=>{
+  camDist = Math.min(600, Math.max(120, camDist + e.deltaY*0.25));
+  updateCamera();
+  e.preventDefault();
+},{passive:false});
+
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+const buildingMeshes = Object.values(nodeMeshes).map(o=>o.mesh);
+function handleCanvasClick(e){
+  const rect = canvas.getBoundingClientRect();
+  pointerNDC.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  pointerNDC.y = -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(pointerNDC, camera);
+  const hits = raycaster.intersectObjects(buildingMeshes);
+  if(hits.length===0) return;
+  const busId = hits[0].object.userData.busId;
+  if(busId===1) { log('bus 1 is the main substation — it cannot be marked as faulted.', 'warn'); return; }
+  toggleFault(busId);
+}
+
+function resize(){
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w,h,false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas);
+
+let spin = true;
+function animate(){
+  requestAnimationFrame(animate);
+  if(spin && !dragging){ camTheta += 0.0007; updateCamera(); }
+  renderer.render(scene, camera);
+}
+resize();
+animate();
+
+/* =========================================================
+   LOAD FLOW HELPERS (simplified linearized DistFlow, for the
+   compliance panel — Eq. 5 current limit + ANSI voltage band)
+   ========================================================= */
+function bfsTree(adj, root){
+  const parent={}; const order=[root]; const visited=new Set([root]); const queue=[root];
+  while(queue.length){
+    const cur = queue.shift();
+    (adj[cur]||[]).forEach(nb=>{ if(!visited.has(nb)){ visited.add(nb); parent[nb]=cur; order.push(nb); queue.push(nb); } });
+  }
+  return {parent, order};
+}
+function computeFlow(adj, root){
+  const {parent, order} = bfsTree(adj, root);
+  const childrenOf = {};
+  order.forEach(n=>{ if(parent[n]!==undefined) (childrenOf[parent[n]]=childrenOf[parent[n]]||[]).push(n); });
+  const downP={}, downQ={};
+  for(let i=order.length-1;i>=0;i--){
+    const n = order[i];
+    let p = loadData[n][0], q = loadData[n][1];
+    (childrenOf[n]||[]).forEach(c=>{ p+=downP[c]; q+=downQ[c]; });
+    downP[n]=p; downQ[n]=q;
+  }
+  const currents={};
+  order.forEach(n=>{
+    if(parent[n]===undefined) return;
+    const S = Math.sqrt(downP[n]**2+downQ[n]**2); // kVA
+    currents[edgeKey(parent[n],n)] = S/(Math.sqrt(3)*Vbase); // Amps
+  });
+  const voltage={}; voltage[root]=1.0;
+  order.forEach(n=>{
+    if(parent[n]===undefined) return;
+    const p = parent[n];
+    const rx = branchRX[edgeKey(p,n)] || {r:0.5,x:0.5};
+    const dV = ((downP[n]/1000)*rx.r + (downQ[n]/1000)*rx.x) / (Vbase*Vbase);
+    voltage[n] = voltage[p] - dV;
+  });
+  return {downP, downQ, currents, voltage, parent, order};
+}
+// baseline (no-fault) currents → used to derive an illustrative thermal rating per branch
+const baselineAdj = {};
+treeEdges.forEach(([a,b])=>{ (baselineAdj[a]=baselineAdj[a]||[]).push(b); (baselineAdj[b]=baselineAdj[b]||[]).push(a); });
+const baselineFlow = computeFlow(baselineAdj, 1);
+const branchRating = {};
+treeEdges.forEach(([a,b])=>{
+  const key = edgeKey(a,b);
+  branchRating[key] = Math.max(40, baselineFlow.currents[key]*1.25);
+});
+tieEdges.forEach(([a,b])=>{ branchRating[edgeKey(a,b)] = 150; });
+
+/* =========================================================
+   DEMO STATE MACHINE
+   ========================================================= */
+const consoleEl = document.getElementById('console');
+function log(msg, cls){
+  const d = document.createElement('div');
+  d.className = 'l' + (cls?(' '+cls):'');
+  d.textContent = '> ' + msg;
+  consoleEl.appendChild(d);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+function setBuildingState(n, color, intensity){
+  const o = nodeMeshes[n];
+  o.mat.color.setHex(color);
+  o.mat.emissive.setHex(color);
+  o.mat.emissiveIntensity = intensity;
+}
+function setLine(a,b,color,visible){
+  const l = lineObjs[edgeKey(a,b)];
+  l.mat.color.setHex(color);
+  l.line.visible = visible !== false;
+}
+
+const btnCuba = document.getElementById('btnCuba');
+const btnHeal = document.getElementById('btnHeal');
+const btnClear = document.getElementById('btnClear');
+const btnReset = document.getElementById('btnReset');
+const selectedChips = document.getElementById('selectedChips');
+const selectionSummary = document.getElementById('selectionSummary');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalBody = document.getElementById('modalBody');
+
+let faultedNodes = new Set();
+let healed = false;
+
+function toggleFault(n){
+  if(healed) repaintIdle(); // selecting again after a heal starts a fresh scenario
+  if(faultedNodes.has(n)) faultedNodes.delete(n); else faultedNodes.add(n);
+  refreshSelectionVisuals();
+}
+
+function refreshSelectionVisuals(){
+  Object.entries(selectionRings).forEach(([n,ring])=>{ ring.visible = faultedNodes.has(parseInt(n)); });
+  Object.keys(nodeMeshes).forEach(n=>{
+    n = parseInt(n); if(n===1) return;
+    const o = nodeMeshes[n];
+    if(faultedNodes.has(n)) setBuildingState(n, 0xe4483b, 0.9);
+    else setBuildingState(n, o.base, derMap[n] ? 0.85 : 0.32);
+  });
+  selectedChips.innerHTML = '';
+  [...faultedNodes].sort((a,b)=>a-b).forEach(n=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = 'Bus '+n+' <button data-n="'+n+'">✕</button>';
+    chip.querySelector('button').addEventListener('click', (e)=>{ e.stopPropagation(); toggleFault(n); });
+    selectedChips.appendChild(chip);
+  });
+  if(faultedNodes.size===0){
+    selectionSummary.textContent = 'No buses selected. Click buildings in the city to mark broken equipment.';
+  } else {
+    selectionSummary.innerHTML = '<b style="color:var(--fault)">'+faultedNodes.size+' bus'+(faultedNodes.size>1?'es':'')+'</b> marked as faulted:<br>'+[...faultedNodes].sort((a,b)=>a-b).map(n=>'Bus '+n+' — branch '+(parentOf[n]||'?')+'–'+n+' will be opened by protection').join('<br>');
+  }
+  btnHeal.disabled = faultedNodes.size===0;
+}
+
+/* ---------- core self-healing solver ---------- */
+function findComponent(startList, adj){
+  const seen = new Set(); const comps = [];
+  startList.forEach(n=>{
+    if(seen.has(n)) return;
+    const comp=[]; const q=[n]; seen.add(n);
+    while(q.length){ const cur=q.shift(); comp.push(cur); (adj[cur]||[]).forEach(nb=>{ if(!seen.has(nb)){seen.add(nb); q.push(nb);} }); }
+    comps.push(comp);
+  });
+  return comps;
+}
+
+function runSelfHeal(){
+  healed = true;
+  const remainingNodes = allNodeIds.filter(n=>!faultedNodes.has(n));
+  log('self-healing engine: BFS reconfiguration search initiated…');
+  [...faultedNodes].sort((a,b)=>a-b).forEach(n=>{
+    log('FAULT: equipment failure at bus '+n+' — protection opens branch '+parentOf[n]+'–'+n, 'warn');
+    setLine(parentOf[n], n, 0xe4483b, true);
+  });
+
+  // graph with faulted nodes (and their edges) removed
+  const adj = {};
+  treeEdges.forEach(([a,b])=>{
+    if(faultedNodes.has(a)||faultedNodes.has(b)) return;
+    (adj[a]=adj[a]||[]).push(b); (adj[b]=adj[b]||[]).push(a);
+  });
+  const comps = findComponent(remainingNodes, adj);
+  const energizedComp = comps.find(c=>c.includes(1));
+  const originalEnergized = new Set(energizedComp);
+  let energizedSet = new Set(energizedComp);
+  const islands = comps.filter(c=>c!==energizedComp);
+  const activatedTies = [];
+
+  let changed = true;
+  while(changed){
+    changed = false;
+    for(const [a,b] of tieEdges){
+      if(faultedNodes.has(a)||faultedNodes.has(b)) continue;
+      const key = edgeKey(a,b);
+      if(activatedTies.includes(key)) continue;
+      const aIn = energizedSet.has(a), bIn = energizedSet.has(b);
+      if(aIn && !bIn){
+        const isl = islands.find(c=>c.includes(b) && !c.every(x=>energizedSet.has(x)));
+        if(isl){ isl.forEach(x=>energizedSet.add(x)); activatedTies.push(key); changed=true; log('tie-switch '+a+'–'+b+' CLOSED — bridges bus '+b+'\'s zone back to the main feeder', 'new'); }
+      } else if(bIn && !aIn){
+        const isl = islands.find(c=>c.includes(a) && !c.every(x=>energizedSet.has(x)));
+        if(isl){ isl.forEach(x=>energizedSet.add(x)); activatedTies.push(key); changed=true; log('tie-switch '+a+'–'+b+' CLOSED — bridges bus '+a+'\'s zone back to the main feeder', 'new'); }
+      }
+    }
+  }
+  activatedTies.forEach(k=>{ const [a,b]=k.split('-').map(Number); setLine(a,b,0x34d399,true); });
+  tieEdges.forEach(([a,b])=>{ if(!activatedTies.includes(edgeKey(a,b))) setLine(a,b,0x2a3038,true); });
+
+  const remainingIslands = islands.filter(c=>!c.every(x=>energizedSet.has(x)));
+  const islandStatus = []; // {nodes, status:'islanded'|'dark', derNode}
+  remainingIslands.forEach(c=>{
+    const derNode = c.find(n=>derMap[n]);
+    islandStatus.push({nodes:c, status: derNode ? 'islanded' : 'dark', derNode});
+  });
+
+  // paint result
+  allNodeIds.forEach(n=>{
+    if(faultedNodes.has(n)) return; // already painted red
+    if(originalEnergized.has(n)){
+      setBuildingState(n, nodeMeshes[n].base, derMap[n] ? 0.85 : 0.32); // untouched by the fault
+    } else if(energizedSet.has(n)){
+      setBuildingState(n, 0x34d399, 0.65); // restored via tie
+    }
+  });
+  islandStatus.forEach(({nodes,status})=>{
+    nodes.forEach(n=>{
+      if(faultedNodes.has(n)) return;
+      setBuildingState(n, status==='islanded' ? 0xf5a623 : 0x1c2029, status==='islanded' ? 0.9 : 0.05);
+    });
+  });
+
+  const restoredCount = [...energizedSet].filter(n=>!originalEnergized.has(n)).length;
+  const islandedCount = islandStatus.filter(s=>s.status==='islanded').reduce((s,i)=>s+i.nodes.length,0);
+  const darkCount = islandStatus.filter(s=>s.status==='dark').reduce((s,i)=>s+i.nodes.length,0);
+  log(restoredCount+' buses restored via tie-line reroute.', 'new');
+  if(islandedCount) log(islandedCount+' buses sustained in DER islanding mode.', 'new');
+  if(darkCount) log(darkCount+' buses remain de-energized — no viable restoration path.', 'warn');
+
+  // compliance check on the final energized (grid-connected) network only
+  const finalAdj = {};
+  treeEdges.forEach(([a,b])=>{
+    if(faultedNodes.has(a)||faultedNodes.has(b)) return;
+    if(!energizedSet.has(a) || !energizedSet.has(b)) return;
+    (finalAdj[a]=finalAdj[a]||[]).push(b); (finalAdj[b]=finalAdj[b]||[]).push(a);
+  });
+  activatedTies.forEach(k=>{
+    const [a,b] = k.split('-').map(Number);
+    (finalAdj[a]=finalAdj[a]||[]).push(b); (finalAdj[b]=finalAdj[b]||[]).push(a);
+  });
+  const flow = computeFlow(finalAdj, 1);
+  const voltViolations = [];
+  const currViolations = [];
+  flow.order.forEach(n=>{
+    const v = flow.voltage[n];
+    if(v<VMIN || v>VMAX) voltViolations.push({n, v});
+  });
+  Object.keys(flow.currents).forEach(key=>{
+    const I = flow.currents[key];
+    const rating = branchRating[key] || 200;
+    if(I > rating) currViolations.push({key, I, rating});
+  });
+  const voltOk = flow.order.length - voltViolations.length;
+  const currOk = Object.keys(flow.currents).length - currViolations.length;
+  document.getElementById('voltCompliance').textContent = voltOk+'/'+flow.order.length;
+  document.getElementById('voltFill').style.width = (100*voltOk/flow.order.length).toFixed(0)+'%';
+  document.getElementById('voltFill').style.background = voltViolations.length ? 'var(--fault)' : 'var(--restore)';
+  const totalBranches = Object.keys(flow.currents).length;
+  document.getElementById('currCompliance').textContent = currOk+'/'+totalBranches;
+  document.getElementById('currFill').style.width = (100*currOk/totalBranches).toFixed(0)+'%';
+  document.getElementById('currFill').style.background = currViolations.length ? 'var(--fault)' : 'var(--restore)';
+  if(voltViolations.length) log(voltViolations.length+' bus(es) outside the 0.95–1.05 pu voltage band.', 'warn');
+  if(currViolations.length) log(currViolations.length+' branch(es) exceed their thermal current rating.', 'warn');
+  if(!voltViolations.length && !currViolations.length) log('all restored branches within voltage and current limits (Eq. 5).', 'new');
+
+  showSolutionsModal({islandStatus, activatedTies, restoredCount, darkCount, voltViolations, currViolations, flow});
+  btnHeal.disabled = true;
+}
+
+function rcaFor(n){
+  // deterministic pseudo-RCA seeded by bus id, in the spirit of Eq. 6–8
+  const seed = (n*2654435761) % 1000 / 1000;
+  const Ctemp = 0.3 + seed*0.5, Cload = 0.25 + ((seed*7)%1)*0.4, Cage = 0.2 + ((seed*13)%1)*0.6;
+  const sum = Ctemp+Cload+Cage;
+  const r = {temp:Ctemp/sum, load:Cload/sum, age:Cage/sum};
+  const dominant = r.temp>=r.load && r.temp>=r.age ? 'thermal stress' : (r.load>=r.age ? 'grid load' : 'equipment aging');
+  return {r, dominant};
+}
+
+function showSolutionsModal({islandStatus, activatedTies, restoredCount, darkCount, voltViolations, currViolations}){
+  let html = '';
+  html += '<div class="modal-summary">';
+  html += '<div><div class="num" style="color:var(--fault)">'+faultedNodes.size+'</div><div class="lbl">Faulted buses</div></div>';
+  html += '<div><div class="num" style="color:var(--restore)">'+restoredCount+'</div><div class="lbl">Restored via tie-line</div></div>';
+  html += '</div>';
+
+  html += '<h4 style="font-size:13px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Per-Bus Diagnosis</h4>';
+  [...faultedNodes].sort((a,b)=>a-b).forEach(n=>{
+    const {dominant} = rcaFor(n);
+    html += '<div class="solution-card"><div class="sc-head"><span class="bus">Bus '+n+'</span><span class="tag dark">EQUIPMENT FAULT</span></div>';
+    html += '<div class="sc-row"><b>Diagnosed cause:</b> '+dominant+' (Eq. 6–8 root-cause decomposition).</div>';
+    html += '<div class="sc-row"><b>Isolation:</b> protection opens branch '+parentOf[n]+'–'+n+'; bus '+n+' itself stays de-energized until the faulted equipment is repaired — it cannot be bypassed.</div></div>';
+  });
+
+  html += '<h4 style="font-size:13px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;">Downstream Restoration</h4>';
+  if(activatedTies.length===0 && islandStatus.length===0){
+    html += '<div class="solution-card"><div class="sc-row">No downstream buses were isolated — the fault only affected the selected bus(es) directly.</div></div>';
+  }
+  activatedTies.forEach(k=>{
+    const [a,b] = k.split('-').map(Number);
+    html += '<div class="solution-card"><div class="sc-head"><span class="bus">Tie '+a+'–'+b+'</span><span class="tag restored">RESTORED</span></div><div class="sc-row">Normally-open tie-switch closed by the BFS reconfiguration search, rerouting power from the main feeder around the fault.</div></div>';
+  });
+  islandStatus.forEach(({nodes,status,derNode})=>{
+    if(status==='islanded'){
+      html += '<div class="solution-card"><div class="sc-head"><span class="bus">Buses '+nodes.filter(n=>!faultedNodes.has(n)).join(', ')+'</span><span class="tag islanded">ISLANDED</span></div><div class="sc-row">No tie-line path back to the main feeder was available. Bus '+derNode+'\'s local DER ('+derMap[derNode]+') sustains critical loads in islanding mode (Table I, row 3).</div></div>';
+    } else {
+      html += '<div class="solution-card"><div class="sc-head"><span class="bus">Buses '+nodes.filter(n=>!faultedNodes.has(n)).join(', ')+'</span><span class="tag dark">DE-ENERGIZED</span></div><div class="sc-row">No tie-line path and no local DER available. These buses remain dark until a repair crew clears the fault.</div></div>';
+    }
+  });
+
+  html += '<h4 style="font-size:13px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;">Electrical Constraint Check (Eq. 5)</h4>';
+  if(voltViolations.length===0 && currViolations.length===0){
+    html += '<div class="solution-card"><div class="sc-row" style="color:var(--restore)">All restored branches and buses stay within the 0.95–1.05 pu voltage band and their thermal current ratings. Reconfiguration is electrically feasible as-is.</div></div>';
+  } else {
+    html += '<div class="solution-card"><div class="violation-list">';
+    voltViolations.forEach(v=>{ html += 'Bus '+v.n+': '+v.v.toFixed(3)+' pu — outside 0.95–1.05 pu<br>'; });
+    currViolations.forEach(v=>{ html += 'Branch '+v.key+': '+v.I.toFixed(0)+' A — exceeds rated '+v.rating.toFixed(0)+' A<br>'; });
+    html += '</div><div class="sc-row" style="margin-top:8px;">The optimizer (Eq. 4) would need to shed lower-priority load or select an alternate tie to bring these back within limits.</div></div>';
+  }
+
+  modalBody.innerHTML = html;
+  modalBackdrop.classList.add('open');
+}
+
+document.getElementById('modalClose').addEventListener('click', ()=> modalBackdrop.classList.remove('open'));
+modalBackdrop.addEventListener('click', e=>{ if(e.target===modalBackdrop) modalBackdrop.classList.remove('open'); });
+
+btnHeal.addEventListener('click', runSelfHeal);
+
+btnCuba.addEventListener('click', ()=>{
+  if(healed) repaintIdle();
+  faultedNodes = new Set([15,26]);
+  refreshSelectionVisuals();
+  log('loaded Cuba-style scenario: simultaneous equipment faults at bus 15 and bus 26 (paper Fig. 4–6).');
+});
+
+function repaintIdle(){
+  healed = false;
+  allNodeIds.forEach(n=>{
+    const o = nodeMeshes[n];
+    setBuildingState(n, o.base, derMap[n] ? 0.85 : (n===1?0.5:0.32));
+  });
+  treeEdges.forEach(([a,b])=> setLine(a,b, 0x3a4150, true));
+  tieEdges.forEach(([a,b])=> setLine(a,b, 0x2a3038, true));
+  document.getElementById('voltCompliance').textContent = '33/33';
+  document.getElementById('voltFill').style.width='100%';
+  document.getElementById('voltFill').style.background='var(--restore)';
+  document.getElementById('currCompliance').textContent = '32/32';
+  document.getElementById('currFill').style.width='100%';
+  document.getElementById('currFill').style.background='var(--restore)';
+}
+
+btnClear.addEventListener('click', ()=>{
+  faultedNodes = new Set();
+  repaintIdle();
+  refreshSelectionVisuals();
+  log('fault selection cleared.');
+});
+
+btnReset.addEventListener('click', ()=>{
+  faultedNodes = new Set();
+  repaintIdle();
+  refreshSelectionVisuals();
+  modalBackdrop.classList.remove('open');
+  consoleEl.innerHTML = '<div class="l">&gt; system idle. all 33 buses nominal.</div>';
+});
+
+// initial paint
+repaintIdle();
+refreshSelectionVisuals();
+</script>
+</body>
+</html>
